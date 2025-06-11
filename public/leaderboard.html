@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>ランキング - Leaderboard</title>
+  <style>
+    body {
+      background: #121212;
+      color: #eee;
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 20px;
+      border-radius: 10px;
+      background-color: #1e1e1e;
+      box-shadow: 0 0 15px #00aaff;
+      line-height: 1.6;
+    }
+    h1 {
+      color: #00aaff;
+      text-align: center;
+      margin-bottom: 25px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: center;
+    }
+    th, td {
+      padding: 12px 8px;
+      border-bottom: 1px solid #333;
+    }
+    th {
+      background-color: #004466;
+      color: #00aaff;
+      font-weight: bold;
+    }
+    tr:hover {
+      background-color: #003355;
+    }
+    .rank-name {
+      color: #55ccff;
+      font-weight: bold;
+    }
+    a.back-link {
+      display: inline-block;
+      margin-top: 30px;
+      text-decoration: none;
+      color: #00aaff;
+      font-weight: bold;
+    }
+    a.back-link:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <h1>ユーザーランキング</h1>
+
+  <table>
+    <thead>
+      <tr>
+        <th>順位</th>
+        <th>ユーザー名</th>
+        <th>ランク</th>
+        <th>残高 (円)</th>
+        <th>累計掛け金 (円)</th>
+      </tr>
+    </thead>
+    <tbody id="leaderboard-body">
+      <!-- JSで動的に埋める -->
+    </tbody>
+  </table>
+
+  <a href="dashboard.html" class="back-link">← ダッシュボードに戻る</a>
+
+  <script>
+    async function fetchLeaderboard() {
+      try {
+        const res = await fetch('/api/leaderboard');
+        if (!res.ok) throw new Error('ランキング取得失敗');
+        const data = await res.json();
+
+        const tbody = document.getElementById('leaderboard-body');
+        tbody.innerHTML = '';
+
+        data.forEach((user, index) => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${index + 1}</td>
+            <td>${user.username}</td>
+            <td class="rank-name">${user.rank_name || 'なし'}</td>
+            <td>${user.balance.toLocaleString()}</td>
+            <td>${user.total_bet.toLocaleString()}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      } catch (error) {
+        alert(error.message);
+      }
+    }
+
+    fetchLeaderboard();
+  </script>
+</body>
+</html>
