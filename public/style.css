@@ -1,0 +1,64 @@
+/* 全体の背景と文字色 */
+body {
+  background: #121212;
+  color: #eee;
+  font-family: Arial, sans-serif;
+  max-width: 800px;
+  margin: 40px auto;
+  padding: 20px;
+  border-radius: 10px;
+  background-color: #1e1e1e;
+  box-shadow: 0 0 15px #00aaff;
+  line-height: 1.6;
+}
+
+/* 見出し */
+h1 {
+  color: #00aaff;
+  text-align: center;
+  margin-bottom: 25px;
+}
+
+/* テーブルの基本設定 */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: center;
+}
+
+/* テーブルのセル */
+th, td {
+  padding: 12px 8px;
+  border-bottom: 1px solid #333;
+}
+
+/* ヘッダーセル */
+th {
+  background-color: #004466;
+  color: #00aaff;
+  font-weight: bold;
+}
+
+/* 行にマウスが乗った時の色 */
+tr:hover {
+  background-color: #003355;
+}
+
+/* ランク名の文字色 */
+.rank-name {
+  color: #55ccff;
+  font-weight: bold;
+}
+
+/* リンク */
+a.back-link {
+  display: inline-block;
+  margin-top: 30px;
+  text-decoration: none;
+  color: #00aaff;
+  font-weight: bold;
+}
+
+a.back-link:hover {
+  text-decoration: underline;
+}
