@@ -28,7 +28,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // APIルート
-app.use('/api', authRoutes);         // ログイン、登録、ユーザー情報取得
+app.use('/api/auth', authRoutes);         // ログイン、登録、ユーザー情報取得
 app.use('/api/rank', rankRoutes);    // ランク更新・昇格処理
 app.use('/api/work', workRoutes);    // work報酬処理
 app.use('/api/admin', adminRoutes);  // 管理者操作（削除・残高操作）
