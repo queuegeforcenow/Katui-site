@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>HiLo - Stake風ゲーム</title>
+  <style>
+    body {
+      background: #121212;
+      color: #eee;
+      font-family: Arial, sans-serif;
+      margin: 0; padding: 20px;
+      display: flex; flex-direction: column; align-items: center;
+    }
+    h1 {
+      margin-bottom: 15px;
+    }
+    #balance {
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+    #bet-section {
+      margin-bottom: 15px;
+    }
+    input[type=number] {
+      width: 120px;
+      padding: 6px;
+      border-radius: 4px;
+      border: none;
+      font-size: 1em;
+      text-align: right;
+    }
+    button {
+      margin-left: 10px;
+      background: #00aaff;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      color: #fff;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    button:disabled {
+      background: #555;
+      cursor: not-allowed;
+    }
+    #game-area {
+      max-width: 400px;
+      width: 100%;
+      background: #1e1e1e;
+      padding: 20px;
+      border-radius: 8px;
+      text-align: center;
+    }
+    #current-card {
+      font-size: 4em;
+      margin: 20px 0;
+      user-select: none;
+    }
+    #message {
+      margin-top: 10px;
+      min-height: 24px;
+      font-weight: bold;
+      font-size: 1.2em;
+    }
+    #score {
+      margin-top: 10px;
+      font-size: 1.1em;
+    }
+    .btn-group button {
+      margin: 10px 10px 0 10px;
+      width: 100px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>HiLo</h1>
+  <div id="balance">残高: 読み込み中...</div>
+
+  <div id="bet-section">
+    <label for="bet-input">賭け金：</label>
+    <input type="number" id="bet-input" min="100" step="100" value="1000" />
+    <button id="start-btn">ゲーム開始</button>
+  </div>
+
+  <div id="game-area" style="display:none;">
+    <div id="current-card">?</div>
+
+    <div class="btn-group">
+      <button id="high-btn" disabled>High</button>
+      <button id="low-btn" disabled>Low</button>
+    </div>
+
+    <div id="message"></div>
+    <div id="score"></div>
+  </div>
+
+  <script>
+    const API_BASE = '/api';
+    let balance = 0;
+    let bet = 0;
+    let currentCard = null;
+    let gameActive = false;
+    let streak = 0;
+
+    async function fetchBalance() {
+      const res = await fetch(`${API_BASE}/user/me`, { credentials: 'include' });
+      if (!res.ok) {
+        alert('ログインしてください');
+        window.location.href = '/login.html';
+        return;
+      }
+      const data = await res.json();
+      balance = data.balance;
+      document.getElementById('balance').textContent = `残高: ${balance.toLocaleString()} 円`;
+    }
+
+    function cardValue(card) {
+      // カードは数値 (1~13)を想定（1:A, 11:J, 12:Q, 13:K）
+      // 表示はA,2...Kに変換
+      const rankMap = {
+        1: 'A', 11: 'J', 12: 'Q', 13: 'K'
+      };
+      return rankMap[card] || card;
+    }
+
+    function updateUI() {
+      document.getElementById('current-card').textContent = cardValue(currentCard);
+      document.getElementById('score').textContent = `連勝数: ${streak}`;
+    }
+
+    function resetGame() {
+      gameActive = false;
+      streak = 0;
+      currentCard = null;
+      document.getElementById('game-area').style.display = 'none';
+      document.getElementById('start-btn').disabled = false;
+      document.getElementById('bet-input').disabled = false;
+      document.getElementById('message').textContent = '';
+      document.getElementById('score').textContent = '';
+      document.getElementById('high-btn').disabled = true;
+      document.getElementById('low-btn').disabled = true;
+    }
+
+    async function startGame() {
+      bet = Number(document.getElementById('bet-input').value);
+      if (bet <= 0 || bet > balance) {
+        alert('賭け金は残高以下の正しい金額を入力してください');
+        return;
+      }
+
+      const res = await fetch(`${API_BASE}/games/hilo/start`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ bet }),
+      });
+      if (!res.ok) {
+        alert('ゲーム開始に失敗しました');
+        return;
+      }
+      const data = await res.json();
+      currentCard = data.currentCard;
+      streak = 0;
+      gameActive = true;
+
+      balance -= bet;
+      document.getElementById('balance').textContent = `残高: ${balance.toLocaleString()} 円`;
+
+      document.getElementById('game-area').style.display = 'block';
+      document.getElementById('start-btn').disabled = true;
+      document.getElementById('bet-input').disabled = true;
+      document.getElementById('high-btn').disabled = false;
+      document.getElementById('low-btn').disabled = false;
+      document.getElementById('message').textContent = '次のカードはHighかLowか予想してください。';
+      updateUI();
+    }
+
+    async function guess(isHigh) {
+      if (!gameActive) return;
+      const res = await fetch(`${API_BASE}/games/hilo/guess`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ guess: isHigh ? 'high' : 'low' }),
+      });
+      if (!res.ok) {
+        alert('処理に失敗しました');
+        return;
+      }
+      const data = await res.json();
+      currentCard = data.currentCard;
+      streak = data.streak;
+      balance = data.balance;
+
+      updateUI();
+
+      if (data.result === 'win') {
+        document.getElementById('message').textContent = `正解！連勝中: ${streak}回`;
+      } else if (data.result === 'lose') {
+        document.getElementById('message').textContent = `不正解。ゲーム終了。連勝数: ${streak}`;
+        gameActive = false;
+        document.getElementById('high-btn').disabled = true;
+        document.getElementById('low-btn').disabled = true;
+        document.getElementById('start-btn').disabled = false;
+        document.getElementById('bet-input').disabled = false;
+      } else if (data.result === 'draw') {
+        document.getElementById('message').textContent = '引き分け。続けてください。';
+      }
+
+      document.getElementById('balance').textContent = `残高: ${balance.toLocaleString()} 円`;
+    }
+
+    document.getElementById('start-btn').addEventListener('click', startGame);
+    document.getElementById('high-btn').addEventListener('click', () => guess(true));
+    document.getElementById('low-btn').addEventListener('click', () => guess(false));
+
+    fetchBalance();
+    resetGame();
+  </script>
+
+</body>
+</html>
