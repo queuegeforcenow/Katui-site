@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>guns.lol</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #121212;
+      color: #eee;
+      margin: 0; padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      flex-direction: column;
+    }
+    #login, #portal, #game-area {
+      background: #1e1e1e;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 0 10px #00aaff;
+      width: 320px;
+      text-align: center;
+    }
+    input[type="text"], input[type="password"] {
+      width: 90%;
+      padding: 8px;
+      margin: 10px 0;
+      border-radius: 4px;
+      border: none;
+    }
+    button {
+      background: #00aaff;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      color: #fff;
+      font-weight: bold;
+      cursor: pointer;
+      margin-top: 10px;
+      width: 100%;
+    }
+    button:hover {
+      background: #0088cc;
+    }
+    #error-msg {
+      color: #ff5555;
+      margin-top: 10px;
+      font-weight: bold;
+    }
+    #welcome-msg {
+      margin-bottom: 15px;
+      font-size: 1.2em;
+    }
+    .nav-btn {
+      background: #0077bb;
+      margin: 5px 0;
+      width: 100%;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ログイン画面 -->
+  <div id="login">
+    <h2>ログイン</h2>
+    <input type="text" id="username" placeholder="ユーザーネーム" autocomplete="username" />
+    <input type="password" id="password" placeholder="パスワード" autocomplete="current-password" />
+    <button id="login-btn">ログイン</button>
+    <div id="error-msg"></div>
+  </div>
+
+  <!-- ポータル画面 -->
+  <div id="portal" style="display:none;">
+    <div id="welcome-msg"></div>
+    <button class="nav-btn" data-page="blackjack">ブラックジャック</button>
+    <button class="nav-btn" data-page="mines">Mines</button>
+    <button class="nav-btn" data-page="hilo">Hilo</button>
+    <button class="nav-btn" data-page="ranking">ランキング</button>
+    <button id="logout-btn" style="background:#bb3300;">ログアウト</button>
+  </div>
+
+  <!-- ゲーム・ページ表示エリア -->
+  <div id="game-area" style="display:none; width:320px; margin-top: 20px; color:#eee;">
+    <!-- ここにゲームやランキングのHTMLを動的に入れる -->
+  </div>
+
+<script>
+  // APIのエンドポイント（例）
+  const API_BASE = '/api';
+
+  let currentUser = null;
+
+  const loginDiv = document.getElementById('login');
+  const portalDiv = document.getElementById('portal');
+  const gameAreaDiv = document.getElementById('game-area');
+  const errorMsgDiv = document.getElementById('error-msg');
+  const welcomeMsgDiv = document.getElementById('welcome-msg');
+
+  document.getElementById('login-btn').addEventListener('click', async () => {
+    errorMsgDiv.textContent = '';
+    const username = document.getElementById('username').value.trim();
+    const password = document.getElementById('password').value;
+    if (!username || !password) {
+      errorMsgDiv.textContent = 'ユーザーネームとパスワードを入力してください';
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_BASE}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        currentUser = data.user;
+        loginDiv.style.display = 'none';
+        portalDiv.style.display = 'block';
+        welcomeMsgDiv.textContent = `ようこそ、${currentUser.username} さん`;
+        gameAreaDiv.style.display = 'none';
+      } else {
+        errorMsgDiv.textContent = data.message || 'ログインに失敗しました';
+      }
+    } catch (e) {
+      errorMsgDiv.textContent = '通信エラーが発生しました';
+    }
+  });
+
+  // ログアウト
+  document.getElementById('logout-btn').addEventListener('click', () => {
+    currentUser = null;
+    loginDiv.style.display = 'block';
+    portalDiv.style.display = 'none';
+    gameAreaDiv.style.display = 'none';
+    errorMsgDiv.textContent = '';
+    document.getElementById('username').value = '';
+    document.getElementById('password').value = '';
+  });
+
+  // ナビゲーションボタンのクリックでゲームページなどに遷移
+  document.querySelectorAll('.nav-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const page = btn.dataset.page;
+      gameAreaDiv.style.display = 'block';
+      portalDiv.style.display = 'none';
+      errorMsgDiv.textContent = '';
+      // ページ読み込みはfetchでAPIから取得でも良いが
+      // ここでは簡単にダミーテキストを入れる
+      switch(page) {
+        case 'blackjack':
+          gameAreaDiv.innerHTML = `<h3>ブラックジャック</h3><p>ここにブラックジャックゲームUIを表示します。</p>`;
+          break;
+        case 'mines':
+          gameAreaDiv.innerHTML = `<h3>Mines</h3><p>ここにMinesゲームUIを表示します。</p>`;
+          break;
+        case 'hilo':
+          gameAreaDiv.innerHTML = `<h3>Hilo</h3><p>ここにHiloゲームUIを表示します。</p>`;
+          break;
+        case 'ranking':
+          gameAreaDiv.innerHTML = `<h3>ランキング</h3><p>ランキング一覧を表示します。</p>`;
+          break;
+        default:
+          gameAreaDiv.innerHTML = `<p>不明なページです。</p>`;
+      }
+    });
+  });
+</script>
+
+</body>
+</html>
