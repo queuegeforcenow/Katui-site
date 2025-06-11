@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>ブラックジャック - Stake風ゲーム</title>
+  <style>
+    body {
+      background: #121212;
+      color: #eee;
+      font-family: Arial, sans-serif;
+      margin: 0; padding: 20px;
+      display: flex; flex-direction: column; align-items: center;
+    }
+    h1 {
+      margin-bottom: 10px;
+    }
+    #balance {
+      font-weight: bold;
+      margin-bottom: 15px;
+    }
+    #bet-section {
+      margin-bottom: 15px;
+    }
+    input[type=number] {
+      width: 120px;
+      padding: 6px;
+      border-radius: 4px;
+      border: none;
+      font-size: 1em;
+      text-align: right;
+    }
+    button {
+      margin-left: 10px;
+      background: #00aaff;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      color: #fff;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    button:disabled {
+      background: #555;
+      cursor: not-allowed;
+    }
+    #game-area {
+      max-width: 600px;
+      width: 100%;
+      background: #1e1e1e;
+      padding: 20px;
+      border-radius: 8px;
+    }
+    .hand {
+      margin-bottom: 15px;
+    }
+    .hand h3 {
+      margin: 0 0 5px 0;
+    }
+    .cards {
+      display: flex;
+      gap: 8px;
+    }
+    .card {
+      width: 50px;
+      height: 70px;
+      background: white;
+      color: black;
+      border-radius: 6px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-weight: bold;
+      font-size: 1.2em;
+      user-select: none;
+    }
+    #message {
+      font-size: 1.2em;
+      margin-top: 10px;
+      min-height: 24px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>ブラックジャック</h1>
+  <div id="balance">残高: 読み込み中...</div>
+
+  <div id="bet-section">
+    <label for="bet-input">賭け金：</label>
+    <input type="number" id="bet-input" min="100" step="100" value="1000" />
+    <button id="start-btn">ゲーム開始</button>
+  </div>
+
+  <div id="game-area" style="display:none;">
+    <div class="hand" id="dealer-hand">
+      <h3>ディーラーの手札</h3>
+      <div class="cards" id="dealer-cards"></div>
+    </div>
+    <div class="hand" id="player-hand">
+      <h3>あなたの手札</h3>
+      <div class="cards" id="player-cards"></div>
+    </div>
+
+    <button id="hit-btn">カードを引く</button>
+    <button id="stand-btn">スタンド</button>
+
+    <div id="message"></div>
+  </div>
+
+  <script>
+    const API_BASE = '/api';
+    let balance = 0;
+    let bet = 0;
+    let dealerCards = [];
+    let playerCards = [];
+    let gameOver = false;
+
+    // 取得関数
+    async function fetchBalance() {
+      const res = await fetch(`${API_BASE}/user/me`, { credentials: 'include' });
+      if (!res.ok) {
+        alert('ログインしてください');
+        window.location.href = '/login.html';
+        return;
+      }
+      const data = await res.json();
+      balance = data.balance;
+      document.getElementById('balance').textContent = `残高: ${balance.toLocaleString()} 円`;
+    }
+
+    function cardToText(card) {
+      // card = { suit: 'H', rank: 'A' } などを想定
+      // 簡単にランクのみ表示
+      return card.rank;
+    }
+
+    // カード合計値計算(ブラックジャックルール)
+    function calcPoints(cards) {
+      let sum = 0;
+      let aceCount = 0;
+      for (const c of cards) {
+        if (c.rank === 'A') {
+          aceCount++;
+          sum += 11;
+        } else if (['J', 'Q', 'K'].includes(c.rank)) {
+          sum += 10;
+        } else {
+          sum += Number(c.rank);
+        }
+      }
+      while (sum > 21 && aceCount > 0) {
+        sum -= 10;
+        aceCount--;
+      }
+      return sum;
+    }
+
+    function renderCards(containerId, cards, hideFirst=false) {
+      const container = document.getElementById(containerId);
+      container.innerHTML = '';
+      cards.forEach((card, i) => {
+        const div = document.createElement('div');
+        div.className = 'card';
+        if (hideFirst && i === 0) {
+          div.textContent = '?';
+          div.style.background = '#444';
+          div.style.color = '#ccc';
+        } else {
+          div.textContent = cardToText(card);
+          div.style.background = 'white';
+          div.style.color = 'black';
+        }
+        container.appendChild(div);
+      });
+    }
+
+    function resetGame() {
+      dealerCards = [];
+      playerCards = [];
+      gameOver = false;
+      document.getElementById('message').textContent = '';
+      document.getElementById('game-area').style.display = 'none';
+      document.getElementById('start-btn').disabled = false;
+      document.getElementById('bet-input').disabled = false;
+    }
+
+    async function startGame() {
+      bet = Number(document.getElementById('bet-input').value);
+      if (bet <= 0 || bet > balance) {
+        alert('賭け金は残高以下の正しい金額を入力してください');
+        return;
+      }
+
+      // APIでゲーム開始処理を呼ぶ（例）
+      const res = await fetch(`${API_BASE}/games/blackjack/start`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bet }),
+      });
+      if (!res.ok) {
+        alert('ゲーム開始に失敗しました');
+        return;
+      }
+      const data = await res.json();
+      dealerCards = data.dealerCards;
+      playerCards = data.playerCards;
+
+      document.getElementById('start-btn').disabled = true;
+      document.getElementById('bet-input').disabled = true;
+      document.getElementById('game-area').style.display = 'block';
+
+      renderCards('dealer-cards', dealerCards, true);
+      renderCards('player-cards', playerCards, false);
+      document.getElementById('message').textContent = 'カードを引くかスタンドしてください。';
+
+      balance -= bet;
+      document.getElementById('balance').textContent = `残高: ${balance.toLocaleString()} 円`;
+    }
+
+    async function hit() {
+      if (gameOver) return;
+      const res = await fetch(`${API_BASE}/games/blackjack/hit`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        alert('カードを引く処理に失敗しました');
+        return;
+      }
+      const data = await res.json();
+      playerCards = data.playerCards;
+      dealerCards = data.dealerCards;
+      const status = data.status;
+      renderCards('dealer-cards', dealerCards, true);
+      renderCards('player-cards', playerCards);
+      if (status === 'bust') {
+        gameOver = true;
+        revealDealerCards();
+        document.getElementById('message').textContent = 'バーストしました。あなたの負けです。';
+      } else {
+        document.getElementById('message').textContent = 'カードを引くかスタンドしてください。';
+      }
+    }
+
+    async function stand() {
+      if (gameOver) return;
+      const res = await fetch(`${API_BASE}/games/blackjack/stand`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        alert('スタンド処理に失敗しました');
+        return;
+      }
+      const data = await res.json();
+      dealerCards = data.dealerCards;
+      playerCards = data.playerCards;
+      const result = data.result; // win, lose, draw
+      revealDealerCards();
+      gameOver = true;
+
+      if (result === 'win') {
+        document.getElementById('message').textContent = 'あなたの勝ちです！';
+      } else if (result === 'lose') {
+        document.getElementById('message').textContent = 'あなたの負けです。';
+      } else {
+        document.getElementById('message').textContent = '引き分けです。';
+      }
+
+      // 残高更新（APIレスポンスに残高があれば更新）
+      if (data.balance !== undefined) {
+        balance = data.balance;
+        document.getElementById('balance').textContent = `残高: ${balance.toLocaleString()} 円`;
+      }
+    }
+
+    function revealDealerCards() {
+      renderCards('dealer-cards', dealerCards, false);
+    }
+
+    document.getElementById('start-btn').addEventListener('click', startGame);
+    document.getElementById('hit-btn').addEventListener('click', hit);
+    document.getElementById('stand-btn').addEventListener('click', stand);
+
+    fetchBalance();
+    resetGame();
+  </script>
+
+</body>
+</html>
