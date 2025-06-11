@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>マイダッシュボード - Stake風サイト</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #121212;
+      color: #eee;
+      margin: 0; padding: 20px;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #1e1e1e;
+      padding: 10px 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+    }
+    header h1 {
+      margin: 0;
+      font-size: 1.5em;
+    }
+    button {
+      background: #00aaff;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      color: #fff;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #0088cc;
+    }
+    section {
+      background: #1e1e1e;
+      padding: 20px;
+      border-radius: 8px;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    dl {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 20px;
+    }
+    dt {
+      width: 120px;
+      font-weight: bold;
+    }
+    dd {
+      flex-grow: 1;
+      margin: 0;
+    }
+    a {
+      color: #00aaff;
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>ダッシュボード</h1>
+  <button id="logout-btn">ログアウト</button>
+</header>
+
+<section>
+  <h2>アカウント情報</h2>
+  <dl>
+    <dt>ユーザーID</dt><dd id="user-id">読み込み中...</dd>
+    <dt>ユーザーネーム</dt><dd id="username">読み込み中...</dd>
+    <dt>残高</dt><dd id="balance">読み込み中...</dd>
+    <dt>ランク</dt><dd id="rank-name">読み込み中...</dd>
+    <dt>昇格ボーナス</dt><dd id="rank-bonus">読み込み中...</dd>
+  </dl>
+
+  <h3>遊び方・説明</h3>
+  <p><a href="/help.html" target="_blank" rel="noopener noreferrer">遊び方の説明ページを見る</a></p>
+</section>
+
+<script>
+  const API_BASE = '/api';
+
+  async function fetchUserData() {
+    try {
+      const res = await fetch(`${API_BASE}/user/me`, {
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('認証エラー');
+      const data = await res.json();
+      document.getElementById('user-id').textContent = data.id;
+      document.getElementById('username').textContent = data.username;
+      document.getElementById('balance').textContent = data.balance.toLocaleString() + ' 円';
+      document.getElementById('rank-name').textContent = data.rank ? data.rank.name : 'なし';
+      document.getElementById('rank-bonus').textContent = data.rank ? data.rank.bonus.toLocaleString() + ' 円' : 'なし';
+    } catch (e) {
+      alert('ログイン状態が無効です。ログイン画面に戻ります。');
+      window.location.href = '/login.html';
+    }
+  }
+
+  document.getElementById('logout-btn').addEventListener('click', async () => {
+    await fetch(`${API_BASE}/auth/logout`, {
+      method: 'POST',
+      credentials: 'include',
+    });
+    window.location.href = '/login.html';
+  });
+
+  fetchUserData();
+</script>
+
+</body>
+</html>
