@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>Mines - Stake風ゲーム</title>
+  <style>
+    body {
+      background: #121212;
+      color: #eee;
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    h1 {
+      margin-bottom: 15px;
+    }
+    #balance {
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+    #bet-section {
+      margin-bottom: 15px;
+    }
+    input[type=number] {
+      width: 120px;
+      padding: 6px;
+      border-radius: 4px;
+      border: none;
+      font-size: 1em;
+      text-align: right;
+    }
+    button {
+      margin-left: 10px;
+      background: #00aaff;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      color: #fff;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    button:disabled {
+      background: #555;
+      cursor: not-allowed;
+    }
+    #game-area {
+      max-width: 600px;
+      width: 100%;
+      background: #1e1e1e;
+      padding: 20px;
+      border-radius: 8px;
+      text-align: center;
+    }
+    #minefield {
+      display: grid;
+      grid-template-columns: repeat(10, 40px);
+      grid-gap: 6px;
+      justify-content: center;
+      margin: 20px 0;
+    }
+    .cell {
+      width: 40px;
+      height: 40px;
+      background: #333;
+      border-radius: 6px;
+      cursor: pointer;
+      user-select: none;
+      font-weight: bold;
+      font-size: 20px;
+      line-height: 40px;
+      color: #eee;
+      transition: background-color 0.3s;
+    }
+    .cell.opened {
+      background: #555;
+      cursor: default;
+      color: #0f0;
+    }
+    .cell.bomb {
+      background: #c33;
+      color: #fff;
+      cursor: default;
+    }
+    #message {
+      margin-top: 10px;
+      min-height: 24px;
+      font-weight: bold;
+      font-size: 1.2em;
+    }
+    #stats {
+      margin-top: 10px;
+      font-size: 1.1em;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Mines</h1>
+  <div id="balance">残高: 読み込み中...</div>
+
+  <div id="bet-section">
+    <label for="bet-input">賭け金：</label>
+    <input type="number" id="bet-input" min="100" step="100" value="1000" />
+    <button id="start-btn">ゲーム開始</button>
+  </div>
+
+  <div id="game-area" style="display:none;">
+    <div id="minefield"></div>
+    <button id="cashout-btn" disabled>全キャッシュアウト</button>
+    <div id="message"></div>
+    <div id="stats"></div>
+  </div>
+
+  <script>
+    const API_BASE = '/api';
+    let balance = 0;
+    let bet = 0;
+    let gameActive = false;
+    let openedCells = new Set();
+    let bombs = new Set();
+    let totalCells = 50;
+    let bombCount = 10;
+    let multiplier = 1;
+
+    async function fetchBalance() {
+      const res = await fetch(`${API_BASE}/user/me`, { credentials: 'include' });
+      if (!res.ok) {
+        alert('ログインしてください');
+        window.location.href = '/login.html';
+        return;
+      }
+      const data = await res.json();
+      balance = data.balance;
+      document.getElementById('balance').textContent = `残高: ${balance.toLocaleString()} 円`;
+    }
+
+    function createMinefield() {
+      const container = document.getElementById('minefield');
+      container.innerHTML = '';
+      for (let i = 0; i < totalCells; i++) {
+        const cell = document.createElement('div');
+        cell.classList.add('cell');
+        cell.dataset.index = i;
+        cell.textContent = '';
+        container.appendChild(cell);
+      }
+    }
+
+    async function startGame() {
+      bet = Number(document.getElementById('bet-input').value);
+      if (bet <= 0 || bet > balance) {
+        alert('賭け金は残高以下の正しい金額を入力してください');
+        return;
+      }
+
+      const res = await fetch(`${API_BASE}/games/mines/start`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ bet }),
+      });
+      if (!res.ok) {
+        alert('ゲーム開始に失敗しました');
+        return;
+      }
+      const data = await res.json();
+
+      bombs = new Set(data.bombs); // 爆弾の位置（配列で取得）
+      multiplier = 1;
+      openedCells.clear();
+      gameActive = true;
+
+      balance -= bet;
+      document.getElementById('balance').textContent = `残高: ${balance.toLocaleString()} 円`;
+      document.getElementById('message').textContent = '安全なマスをクリックしてください。';
+      document.getElementById('stats').textContent = `倍率: ${multiplier.toFixed(2)}x`;
+
+      createMinefield();
+      document.getElementById('game-area').style.display = 'block';
+      document.getElementById('start-btn').disabled = true;
+      document.getElementById('bet-input').disabled = true;
+      document.getElementById('cashout-btn').disabled = true;
+
+      document.querySelectorAll('.cell').forEach(cell => {
+        cell.classList.remove('opened', 'bomb');
+        cell.textContent = '';
+        cell.style.cursor = 'pointer';
+        cell.addEventListener('click', onCellClick);
+      });
+    }
+
+    async function onCellClick(e) {
+      if (!gameActive) return;
+      const idx = Number(e.target.dataset.index);
+      if (openedCells.has(idx)) return;
+
+      // 判定はサーバーへ
+      const res = await fetch(`${API_BASE}/games/mines/open`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ index: idx }),
+      });
+      if (!res.ok) {
+        alert('通信エラー');
+        return;
+      }
+      const data = await res.json();
+
+      if (data.result === 'bomb') {
+        // 爆弾踏んだ
+        e.target.classList.add('bomb');
+        e.target.textContent = '💣';
+        document.getElementById('message').textContent = `爆弾！ゲームオーバー。倍率: ${multiplier.toFixed(2)}x`;
+        gameActive = false;
+        document.getElementById('cashout-btn').disabled = true;
+        document.getElementById('start-btn').disabled = false;
+        document.getElementById('bet-input').disabled = false;
+        balance = data.balance;
+        document.getElementById('balance').textContent = `残高: ${balance.toLocaleString()} 円`;
+        revealBombs();
+        disableAllCells();
+        return;
+      }
+
+      // 成功なら
+      e.target.classList.add('opened');
+      e.target.textContent = '✓';
+      e.target.style.color = '#0f0';
+      openedCells.add(idx);
+      multiplier = data.multiplier;
+      balance = data.balance;
+
+      document.getElementById('message').textContent = `成功！倍率: ${multiplier.toFixed(2)}x`;
+      document.getElementById('stats').textContent = `倍率: ${multiplier.toFixed(2)}x`;
+      document.getElementById('balance').textContent = `残高: ${balance.toLocaleString()} 円`;
+
+      document.getElementById('cashout-btn').disabled = false;
+    }
+
+    function revealBombs() {
+      document.querySelectorAll('.cell').forEach(cell => {
+        const idx = Number(cell.dataset.index);
+        if (bombs.has(idx)) {
+          if (!cell.classList.contains('bomb')) {
+            cell.classList.add('bomb');
+            cell.textContent = '💣';
+          }
+        }
+      });
+    }
+
+    function disableAllCells() {
+      document.querySelectorAll('.cell').forEach(cell => {
+        cell.style.cursor = 'default';
+        cell.removeEventListener('click', onCellClick);
+      });
+    }
+
+    async function cashOut() {
+      if (!gameActive) return;
+      const res = await fetch(`${API_BASE}/games/mines/cashout`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        alert('キャッシュアウトに失敗しました');
+        return;
+      }
+      const data = await res.json();
+
+      document.getElementById('message').textContent = `キャッシュアウト成功！払い戻し: ${data.payout.toLocaleString()} 円`;
+      balance = data.balance;
+      document.getElementById('balance').textContent = `残高: ${balance.toLocaleString()} 円`;
+
+      gameActive = false;
+      document.getElementById('cashout-btn').disabled = true;
+      document.getElementById('start-btn').disabled = false;
+      document.getElementById('bet-input').disabled = false;
+
+      disableAllCells();
+      revealBombs();
+    }
+
+    document.getElementById('start-btn').addEventListener('click', startGame);
+    document.getElementById('cashout-btn').addEventListener('click', cashOut);
+
+    fetchBalance();
+  </script>
+
+</body>
+</html>
