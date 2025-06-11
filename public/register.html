@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>guns.lol 登録</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #121212;
+      color: #eee;
+      margin: 0; padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      flex-direction: column;
+    }
+    #register {
+      background: #1e1e1e;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 0 10px #00aaff;
+      width: 320px;
+      text-align: center;
+    }
+    input[type="password"] {
+      width: 90%;
+      padding: 8px;
+      margin: 10px 0;
+      border-radius: 4px;
+      border: none;
+    }
+    button {
+      background: #00aaff;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      color: #fff;
+      font-weight: bold;
+      cursor: pointer;
+      margin-top: 10px;
+      width: 100%;
+    }
+    button:hover {
+      background: #0088cc;
+    }
+    #info-msg {
+      color: #55ff55;
+      margin-top: 10px;
+      font-weight: bold;
+    }
+    #error-msg {
+      color: #ff5555;
+      margin-top: 10px;
+      font-weight: bold;
+    }
+    #username-display {
+      margin-top: 10px;
+      font-weight: bold;
+      color: #00ffff;
+      user-select: all;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="register">
+    <h2>新規会員登録</h2>
+    <p>ユーザーネームは自動生成されます</p>
+    <input type="password" id="password" placeholder="パスワード" autocomplete="new-password" />
+    <button id="register-btn">登録する</button>
+    <div id="username-display"></div>
+    <div id="info-msg"></div>
+    <div id="error-msg"></div>
+  </div>
+
+<script>
+  const API_BASE = '/api';
+
+  document.getElementById('register-btn').addEventListener('click', async () => {
+    const infoMsg = document.getElementById('info-msg');
+    const errorMsg = document.getElementById('error-msg');
+    const usernameDisplay = document.getElementById('username-display');
+    infoMsg.textContent = '';
+    errorMsg.textContent = '';
+    usernameDisplay.textContent = '';
+
+    const password = document.getElementById('password').value;
+    if (!password) {
+      errorMsg.textContent = 'パスワードを入力してください';
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_BASE}/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        usernameDisplay.textContent = `あなたのユーザーネーム: ${data.username}`;
+        infoMsg.textContent = '登録完了しました。ログインしてください。';
+      } else {
+        errorMsg.textContent = data.message || '登録に失敗しました';
+      }
+    } catch {
+      errorMsg.textContent = '通信エラーが発生しました';
+    }
+  });
+</script>
+
+</body>
+</html>
